@@ -7,3 +7,7 @@ cd dockerpi
 docker run -it lukechilds/dockerpi
 
 wget https://cdimage.debian.org/cdimage/archive/11.7.0/armhf/iso-cd/debian-11.7.0-armhf-netinst.iso
+
+
+sudo apt update
+sudo apt install qemu-system-arm
