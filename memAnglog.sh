@@ -1,4 +1,6 @@
-MEM_LOGFILE="memory_usage_gb.csv"                                                                                                                                         
+#!/bin/bash  
+MEM_LOGFILE="memory_usage_gb.csv"
+SERVER_LOGFILE="log_cache_2cli_lung3_server.txt"
 # Add headers to the memory usage CSV file                                                                                                                                
 echo "Timestamp,Available_Memory_GB" > "$MEM_LOGFILE"                                                                                                                     
 # Loop to log memory usage and upload logs to different folders every 30                                                                                                  
@@ -12,13 +14,8 @@ while true; do
     AVAILABLE_MEM_KB=$(grep "MemAvailable" /proc/meminfo | awk '{print $2}')                                                                                              
                                                                                                                                                                           
     # Convert the memory from kB to GB (1 GB = 1,048,576 kB)                                                                                                              
-    if [[ -n "$AVAILABLE_MEM_KB" && "$AVAILABLE_MEM_KB" =~ ^[0-9]+$ ]];                                                                                                   
-    then                                                                                                                                                                  
-        AVAILABLE_MEM_GB=$(echo "scale=2; $AVAILABLE_MEM_KB / 1048576" | bc 2>/dev/null)                                                                                  
-        echo "$TIMESTAMP,$AVAILABLE_MEM_GB" >> "$MEM_LOGFILE"                                                                                                             
-    else                                                                                                                                                                  
-        echo "$TIMESTAMP,Error: Invalid memory value" >> "$MEM_LOGFILE"                                                                                                   
-    fi                                                                                                                                                                    
+    AVAILABLE_MEM_GB=$(echo "scale=2; $AVAILABLE_MEM_KB / 1048576" | bc)
+    echo "$TIMESTAMP,$AVAILABLE_MEM_GB" >> "$LOGFILE"
                                                                                                                                                                           
     ### Google Drive Sync Section ###                                                                                                                                     
     # Sync memory log file to Google Drive folder for memory logs                                                                                                         
