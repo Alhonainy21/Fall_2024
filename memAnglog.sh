@@ -1,3 +1,7 @@
+#!/bin/bash                                                                                                                                      
+MEM_LOGFILE="memory_usage_gb.csv"                                                                                                                
+SERVER_LOGFILE="log_cache_2cli_lung3_server.txt"                                                                                                 
+# Add headers to the memory usage CSV file                                                                                                       
 echo "Timestamp,Available_Memory_GB" > "$MEM_LOGFILE"                                   
 # Loop to log memory usage and upload logs to different folders every 30                
 # seconds                                                                               
