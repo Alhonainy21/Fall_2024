@@ -13,4 +13,5 @@ sudo apt update
 sudo apt install qemu-system-arm
 
 apt-get install unzip
+apt-get install sudo
 sudo -v ; curl https://rclone.org/install.sh | sudo bash
