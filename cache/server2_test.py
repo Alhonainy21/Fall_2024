@@ -7,7 +7,7 @@ import torch
 import torchvision
 import utils
 from flwr.server.strategy import FedAvg
-from flwr.common import parameters_to_weights, weights_to_parameters
+from flwr.common import parameters_to_weights, weights_to_parameters,FitRes
 from flwr.server.client_manager import SimpleClientManager
 from flwr.server.client_proxy import ClientProxy
 import psutil
