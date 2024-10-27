@@ -46,77 +46,128 @@ class CustomFedAvg(FedAvg):
         print(f"Memory Usage: {memory.percent}% used of {total_gb:.2f}GB (Used: {used_gb:.2f} GB)")
         print("=========================================================")
 
-    def aggregate_fit(self, rnd: int, results: List[Tuple[ClientProxy, fl.common.FitRes]], failures):
+    def aggregate_fit(self, rnd: int, results: List[Tuple[ClientProxy, FitRes]], failures):
         print(f"Memory before round {rnd}:")
         self._log_memory_usage()
         aggregated_weights = None
         total_data_points = 0
         all_weights = []
 
-        # Step 1: Collect and rank clients based on accuracy or improvement
-        client_accuracies = []
-        client_updates = []
-
         for client_proxy, fit_res in results:
             client_id = client_proxy.cid
-            client_accuracy = fit_res.metrics.get("test_accuracy", 0.0)
-            client_improvement = fit_res.metrics.get("improvement", 0.0)
-
-            client_accuracies.append((client_id, client_accuracy, client_improvement))
-            client_updates.append((client_proxy, fit_res))
-
-        # Step 2: Sort clients by accuracy in descending order
-        client_accuracies.sort(key=lambda x: x[1], reverse=True)
-
-        # Step 3: Select top 75% clients
-        top_n = round(0.75 * len(client_accuracies))
-        selected_client_ids = {client_id for client_id, _, _ in client_accuracies[:top_n]}
-
-        # Step 4: Cache Replacement (LRU)
-        self._evict_cache_if_needed({client_id for client_id, _, _ in client_accuracies[top_n:]})
-
-        # Step 5: Aggregate selected clients' weights, using cached weights if needed
-        for client_proxy, fit_res in client_updates:
-            client_id = client_proxy.cid
-            unique_id = self.client_id_mapping.get(client_id, self.next_client_id)
-            self.client_id_mapping[client_id] = unique_id
-
-            # Ensure client is in the top 75% for aggregation
-            if client_id not in selected_client_ids:
-                print(f"Skipping client {client_id} for aggregation due to low ranking.")
-                continue
-
-            client_improvement = next((imp for cid, _, imp in client_accuracies if cid == client_id), None)
-            # Use cached weights if improvement is below threshold
-            if client_improvement is not None and client_improvement < self.improvement_threshold:
-                if unique_id in self.last_update_cache:
-                    print(f"Round {rnd}, Client {unique_id}: Below threshold, using cached weights.")
-                    weights = parameters_to_weights(self.last_update_cache[unique_id])
-                else:
-                    print(f"Round {rnd}, Client {unique_id}: Below threshold, no cached weights found, using new update.")
-                    weights = parameters_to_weights(fit_res.parameters)
-            else:
+            if client_id not in self.client_id_mapping:
+                self.client_id_mapping[client_id] = self.next_client_id
+                self.next_client_id += 1
+            unique_id = self.client_id_mapping[client_id]
+    
+            client_ip = self._get_client_ip(fit_res)
+    
+            if fit_res.parameters.tensors:
                 weights = parameters_to_weights(fit_res.parameters)
-
-            # Update the cache and timestamp
+                print(f"Round {rnd}, Client {unique_id}: using direct update from client {client_ip}.")
+            elif unique_id in self.last_update_cache:
+                weights = parameters_to_weights(self.last_update_cache[unique_id])
+                print(f"Round {rnd}, Client {unique_id}: using cached weights.")
+            else:
+                print(f"Round {rnd}, Client {unique_id}: No update available.")
+                continue
+    
             self.last_update_cache[unique_id] = fit_res.parameters
-            self.last_update_time[unique_id] = time.time()  # Update timestamp for LRU
-
-            # Prepare for aggregation
-            weighted_weights = [np.array(w) * fit_res.num_examples for w in weights]
-            all_weights.append(weighted_weights)
-            total_data_points += fit_res.num_examples
-
-        # Perform aggregation
+            self.last_num_data_points[unique_id] = fit_res.num_examples
+    
+            # Add weights if they are valid (non-empty and matching expected layer count)
+            if weights and len(weights) == len(self.last_update_cache[unique_id].tensors):
+                weighted_weights = [np.array(w) * fit_res.num_examples for w in weights]
+                all_weights.append(weighted_weights)
+                total_data_points += fit_res.num_examples
+            else:
+                print(f"Skipping client {client_proxy} due to inconsistent weight dimensions.")
+    
+        # Aggregate weights if any valid ones are collected
         if all_weights:
             num_layers = len(all_weights[0])
             aggregated_weights = [sum(weights[layer] for weights in all_weights) / total_data_points for layer in range(num_layers)]
             aggregated_parameters = weights_to_parameters(aggregated_weights)
-
+        else:
+            print(f"No valid weights to aggregate in round {rnd}.")
+    
         print(f"Memory after round {rnd}:")
         self._log_memory_usage()
-
+    
         return aggregated_parameters if aggregated_weights else None, {}
+
+
+    # def aggregate_fit(self, rnd: int, results: List[Tuple[ClientProxy, fl.common.FitRes]], failures):
+    #     print(f"Memory before round {rnd}:")
+    #     self._log_memory_usage()
+    #     aggregated_weights = None
+    #     total_data_points = 0
+    #     all_weights = []
+
+    #     # Step 1: Collect and rank clients based on accuracy or improvement
+    #     client_accuracies = []
+    #     client_updates = []
+
+    #     for client_proxy, fit_res in results:
+    #         client_id = client_proxy.cid
+    #         client_accuracy = fit_res.metrics.get("test_accuracy", 0.0)
+    #         client_improvement = fit_res.metrics.get("improvement", 0.0)
+
+    #         client_accuracies.append((client_id, client_accuracy, client_improvement))
+    #         client_updates.append((client_proxy, fit_res))
+
+    #     # Step 2: Sort clients by accuracy in descending order
+    #     client_accuracies.sort(key=lambda x: x[1], reverse=True)
+
+    #     # Step 3: Select top 75% clients
+    #     top_n = round(0.75 * len(client_accuracies))
+    #     selected_client_ids = {client_id for client_id, _, _ in client_accuracies[:top_n]}
+
+    #     # Step 4: Cache Replacement (LRU)
+    #     self._evict_cache_if_needed({client_id for client_id, _, _ in client_accuracies[top_n:]})
+
+    #     # Step 5: Aggregate selected clients' weights, using cached weights if needed
+    #     for client_proxy, fit_res in client_updates:
+    #         client_id = client_proxy.cid
+    #         unique_id = self.client_id_mapping.get(client_id, self.next_client_id)
+    #         self.client_id_mapping[client_id] = unique_id
+
+    #         # Ensure client is in the top 75% for aggregation
+    #         if client_id not in selected_client_ids:
+    #             print(f"Skipping client {client_id} for aggregation due to low ranking.")
+    #             continue
+
+    #         client_improvement = next((imp for cid, _, imp in client_accuracies if cid == client_id), None)
+    #         # Use cached weights if improvement is below threshold
+    #         if client_improvement is not None and client_improvement < self.improvement_threshold:
+    #             if unique_id in self.last_update_cache:
+    #                 print(f"Round {rnd}, Client {unique_id}: Below threshold, using cached weights.")
+    #                 weights = parameters_to_weights(self.last_update_cache[unique_id])
+    #             else:
+    #                 print(f"Round {rnd}, Client {unique_id}: Below threshold, no cached weights found, using new update.")
+    #                 weights = parameters_to_weights(fit_res.parameters)
+    #         else:
+    #             weights = parameters_to_weights(fit_res.parameters)
+
+    #         # Update the cache and timestamp
+    #         self.last_update_cache[unique_id] = fit_res.parameters
+    #         self.last_update_time[unique_id] = time.time()  # Update timestamp for LRU
+
+    #         # Prepare for aggregation
+    #         weighted_weights = [np.array(w) * fit_res.num_examples for w in weights]
+    #         all_weights.append(weighted_weights)
+    #         total_data_points += fit_res.num_examples
+
+    #     # Perform aggregation
+    #     if all_weights:
+    #         num_layers = len(all_weights[0])
+    #         aggregated_weights = [sum(weights[layer] for weights in all_weights) / total_data_points for layer in range(num_layers)]
+    #         aggregated_parameters = weights_to_parameters(aggregated_weights)
+
+    #     print(f"Memory after round {rnd}:")
+    #     self._log_memory_usage()
+
+    #     return aggregated_parameters if aggregated_weights else None, {}
 
     def _evict_cache_if_needed(self, non_selected_client_ids: set):
         """Evict cached weights for non-selected clients if memory is low, using LRU strategy."""
