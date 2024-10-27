@@ -7,7 +7,7 @@ import torch
 import torchvision
 import utils
 from flwr.server.strategy import FedAvg
-from flwr.common import parameters_to_weights, weights_to_parameters, FitRes
+from flwr.common import parameters_to_weights, weights_to_parameters
 from flwr.server.client_manager import SimpleClientManager
 from flwr.server.client_proxy import ClientProxy
 import psutil
@@ -25,7 +25,6 @@ class CustomFedAvg(FedAvg):
         self.improvement_threshold = 0.1  # Example threshold for improvement
 
     def _get_client_ip(self, fit_res):
-        # Extract the client's IP address from the fit results' metrics if available
         return fit_res.metrics.get("client_ip", "Unknown IP")
 
     def _log_memory_usage(self):
@@ -56,32 +55,26 @@ class CustomFedAvg(FedAvg):
                 weights = parameters_to_weights(fit_res.parameters)
                 print(f"Round {rnd}, Client {unique_id}: using direct update from client {client_ip}.")
             elif unique_id in self.last_update_cache:
-                weights = parameters_to_weights(self.last_update_cache[unique_id])
-                print(f"Round {rnd}, Client {unique_id}: using cached weights.")
+                # Check if cached weights are dimension-consistent
+                cached_weights = parameters_to_weights(self.last_update_cache[unique_id])
+                if len(cached_weights) == len(weights):  # Ensure dimensions match
+                    weights = cached_weights
+                    print(f"Round {rnd}, Client {unique_id}: using cached weights.")
+                else:
+                    print(f"Skipping cached weights for Client {unique_id} due to dimension mismatch.")
+                    continue
             else:
                 print(f"Round {rnd}, Client {unique_id}: No update available.")
                 continue
     
-            # Only cache weights if they are non-empty
-            if all(weight.size > 0 for weight in weights):
-                self.last_update_cache[unique_id] = fit_res.parameters
-                self.last_num_data_points[unique_id] = fit_res.num_examples
-            else:
-                print(f"Warning: Empty weights received from client {unique_id}. Retaining last valid weights if available.")
-                continue
-
-            # Print weight dimensions for debugging
-            print(f"Round {rnd}, Client {unique_id} weight dimensions: {[w.shape for w in weights]}")
+            self.last_update_cache[unique_id] = fit_res.parameters
+            self.last_num_data_points[unique_id] = fit_res.num_examples
     
-            # Add weights if they match expected layer count
-            if weights and len(weights) == len(self.last_update_cache[unique_id].tensors):
-                weighted_weights = [np.array(w) * fit_res.num_examples for w in weights]
-                all_weights.append(weighted_weights)
-                total_data_points += fit_res.num_examples
-            else:
-                print(f"Skipping client {client_proxy} due to inconsistent weight dimensions.")
+            # Aggregation if weights are dimension-consistent
+            weighted_weights = [np.array(w) * fit_res.num_examples for w in weights]
+            all_weights.append(weighted_weights)
+            total_data_points += fit_res.num_examples
     
-        # Aggregate weights if any valid ones are collected
         if all_weights:
             num_layers = len(all_weights[0])
             aggregated_weights = [sum(weights[layer] for weights in all_weights) / total_data_points for layer in range(num_layers)]
@@ -95,7 +88,6 @@ class CustomFedAvg(FedAvg):
         return aggregated_parameters if aggregated_weights else None, {}
 
     def _evict_cache_if_needed(self, non_selected_client_ids: set):
-        """Evict cached weights for non-selected clients if memory is low, using LRU strategy."""
         memory = psutil.virtual_memory()
         if memory.percent < 80:
             return  # Memory is sufficient, no need to evict
