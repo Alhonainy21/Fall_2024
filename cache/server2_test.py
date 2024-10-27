@@ -53,34 +53,28 @@ class CustomFedAvg(FedAvg):
         print("=========================================================")
 
     def aggregate_fit(self, rnd: int, results: List[Tuple[ClientProxy, FitRes]], failures):
-      print(f"Memory before round {rnd}:")
-      self._log_memory_usage()
-      aggregated_weights = None
-      total_data_points = 0
-      all_weights = []
-  
-      for client_proxy, fit_res in results:
-          client_id = client_proxy.cid
-          if client_id not in self.client_id_mapping:
-              self.client_id_mapping[client_id] = self.next_client_id
-              self.next_client_id += 1
-          unique_id = self.client_id_mapping[client_id]
-  
-          client_ip = self._get_client_ip(fit_res)
-  
-          # Convert parameters to weights
-          weights = parameters_to_weights(fit_res.parameters)
-          
-          # Log dimensions for each client's weights
-          weight_shapes = [np.array(w).shape for w in weights]
-          print(f"Round {rnd}, Client {unique_id} (IP {client_ip}): Weight dimensions {weight_shapes}")
-  
-          # Dimension check: skip if inconsistent with expected shape
-          if unique_id in self.last_update_cache:
-              cached_weight_shapes = [np.array(w).shape for w in parameters_to_weights(self.last_update_cache[unique_id])]
-              if weight_shapes != cached_weight_shapes:
-                  print(f"Skipping client {unique_id} due to inconsistent weight dimensions. Expected: {cached_weight_shapes}, Got: {weight_shapes}")
-                  continue
+        print(f"Memory before round {rnd}:")
+        self._log_memory_usage()
+        aggregated_weights = None
+        total_data_points = 0
+        all_weights = []
+    
+        for client_proxy, fit_res in results:
+            client_id = client_proxy.cid
+            unique_id = self.client_id_mapping.get(client_id, self.next_client_id)
+            self.client_id_mapping[client_id] = unique_id
+            client_ip = self._get_client_ip(fit_res)
+            
+            # Retrieve weights and log dimensions
+            if fit_res.parameters.tensors:
+                weights = parameters_to_weights(fit_res.parameters)
+                print(f"Round {rnd}, Client {unique_id}: Direct update dimensions from client {client_ip}: {[w.shape for w in weights]}")
+            elif unique_id in self.last_update_cache:
+                weights = parameters_to_weights(self.last_update_cache[unique_id])
+                print(f"Round {rnd}, Client {unique_id}: Cached update dimensions: {[w.shape for w in weights]}")
+            else:
+                print(f"Round {rnd}, Client {unique_id}: No update available.")
+                continue
           
           # Update cache and aggregate weights
           self.last_update_cache[unique_id] = fit_res.parameters
