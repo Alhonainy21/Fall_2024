@@ -134,6 +134,16 @@ class CifarClient(fl.client.Client):
             "test_accuracy": test_accuracy,
             "improvement": improvement,
             "client_ip": client_ip,
+            # Place all performance metrics in a distinct sub-dictionary
+            "performance_metrics": {  # New field for performance-related data
+                "train_loss": train_loss,
+                "train_accuracy": train_accuracy,
+                "val_loss": val_loss,
+                "val_accuracy": val_accuracy,
+                "test_loss": test_loss,
+                "test_accuracy": test_accuracy,
+                "improvement": improvement
+            }
         }
 
         if self.current_round >= self.total_rounds:
