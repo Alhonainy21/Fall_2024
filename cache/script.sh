@@ -1,5 +1,6 @@
 #!/bin/bash
 sudo apt-get update -y
+sudo apt-get install screen -y
 sudo apt-get install nano -y
 sudo apt install net-tools -y
 sudo apt-get install curl -y
