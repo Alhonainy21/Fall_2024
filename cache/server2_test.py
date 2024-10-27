@@ -41,6 +41,7 @@ class CustomFedAvg(FedAvg):
         aggregated_weights = None
         total_data_points = 0
         all_weights = []
+        performance_data = []  # To store client performance data
     
         for client_proxy, fit_res in results:
             client_id = client_proxy.cid
@@ -51,27 +52,39 @@ class CustomFedAvg(FedAvg):
     
             client_ip = self._get_client_ip(fit_res)
     
+            # Extract performance metrics
+            performance_metrics = fit_res.metrics.get("performance_metrics", {})
+            if performance_metrics:
+                performance_data.append((client_id, performance_metrics))
+    
+            # Determine whether to use direct update or cached weights
             if fit_res.parameters.tensors:
                 weights = parameters_to_weights(fit_res.parameters)
                 print(f"Round {rnd}, Client {unique_id}: using direct update from client {client_ip}.")
+                self.last_update_cache[unique_id] = fit_res.parameters
             elif unique_id in self.last_update_cache:
                 cached_weights = parameters_to_weights(self.last_update_cache[unique_id])
-                print(f"Round {rnd}, Client {unique_id}: using cached weights.")
-                weights = cached_weights  # Ensure weights is assigned here
+                if len(cached_weights) == len(self.last_update_cache[unique_id].tensors):
+                    weights = cached_weights
+                    print(f"Round {rnd}, Client {unique_id}: using cached weights.")
+                else:
+                    print(f"Round {rnd}, Client {unique_id}: cached weights are inconsistent, removing from cache.")
+                    del self.last_update_cache[unique_id]
+                    continue
             else:
                 print(f"Round {rnd}, Client {unique_id}: No update available and no cached weights found.")
                 continue
     
-            self.last_update_cache[unique_id] = fit_res.parameters
-            self.last_num_data_points[unique_id] = fit_res.num_examples
-    
-            if weights and len(weights) == len(self.last_update_cache[unique_id].tensors):
+            if weights:
                 weighted_weights = [np.array(w) * fit_res.num_examples for w in weights]
                 all_weights.append(weighted_weights)
                 total_data_points += fit_res.num_examples
-            else:
-                print(f"Skipping client {client_proxy} due to inconsistent weight dimensions.")
     
+        # After loop: decide top clients based on `performance_data`
+        top_clients = sorted(performance_data, key=lambda x: x[1]["test_accuracy"], reverse=True)[:int(0.75 * len(performance_data))]
+        print(f"Top clients based on performance: {[client_id for client_id, _ in top_clients]}")
+    
+        # Aggregate weights if any valid ones are collected
         if all_weights:
             num_layers = len(all_weights[0])
             aggregated_weights = [sum(weights[layer] for weights in all_weights) / total_data_points for layer in range(num_layers)]
@@ -83,6 +96,7 @@ class CustomFedAvg(FedAvg):
         self._log_memory_usage()
     
         return aggregated_parameters if aggregated_weights else None, {}
+
 
 
     def _evict_cache_if_needed(self, non_selected_client_ids: set):
