@@ -41,7 +41,6 @@ class CustomFedAvg(FedAvg):
         aggregated_weights = None
         total_data_points = 0
         all_weights = []
-        performance_data = []  # To store client performance data
     
         for client_proxy, fit_res in results:
             client_id = client_proxy.cid
@@ -49,53 +48,56 @@ class CustomFedAvg(FedAvg):
                 self.client_id_mapping[client_id] = self.next_client_id
                 self.next_client_id += 1
             unique_id = self.client_id_mapping[client_id]
-    
+            
             client_ip = self._get_client_ip(fit_res)
-    
-            # Extract performance metrics
-            performance_metrics = fit_res.metrics.get("performance_metrics", {})
-            if performance_metrics:
-                performance_data.append((client_id, performance_metrics))
-    
-            # Determine whether to use direct update or cached weights
+            
+            # Extract performance metrics for evaluation purposes
+            performance_metrics = {
+                "train_loss": fit_res.metrics.get("train_loss"),
+                "train_accuracy": fit_res.metrics.get("train_accuracy"),
+                "val_loss": fit_res.metrics.get("val_loss"),
+                "val_accuracy": fit_res.metrics.get("val_accuracy"),
+                "test_loss": fit_res.metrics.get("test_loss"),
+                "test_accuracy": fit_res.metrics.get("test_accuracy"),
+                "improvement": fit_res.metrics.get("improvement")
+            }
+            
+            # If client sent actual weights, use them; otherwise, check for cached weights
             if fit_res.parameters.tensors:
                 weights = parameters_to_weights(fit_res.parameters)
                 print(f"Round {rnd}, Client {unique_id}: using direct update from client {client_ip}.")
-                self.last_update_cache[unique_id] = fit_res.parameters
             elif unique_id in self.last_update_cache:
-                cached_weights = parameters_to_weights(self.last_update_cache[unique_id])
-                if len(cached_weights) == len(self.last_update_cache[unique_id].tensors):
-                    weights = cached_weights
-                    print(f"Round {rnd}, Client {unique_id}: using cached weights.")
-                else:
-                    print(f"Round {rnd}, Client {unique_id}: cached weights are inconsistent, removing from cache.")
-                    del self.last_update_cache[unique_id]
-                    continue
+                weights = parameters_to_weights(self.last_update_cache[unique_id])
+                print(f"Round {rnd}, Client {unique_id}: using cached weights.")
             else:
-                print(f"Round {rnd}, Client {unique_id}: No update available and no cached weights found.")
+                print(f"Round {rnd}, Client {unique_id}: No update available.")
                 continue
     
-            if weights:
+            # Cache the most recent weights and metrics
+            self.last_update_cache[unique_id] = fit_res.parameters
+            self.last_num_data_points[unique_id] = fit_res.num_examples
+            
+            # Only include weights in aggregation if dimensions are valid
+            if weights and len(weights) == len(self.last_update_cache[unique_id].tensors):
                 weighted_weights = [np.array(w) * fit_res.num_examples for w in weights]
                 all_weights.append(weighted_weights)
                 total_data_points += fit_res.num_examples
-    
-        # After loop: decide top clients based on `performance_data`
-        top_clients = sorted(performance_data, key=lambda x: x[1]["test_accuracy"], reverse=True)[:int(0.75 * len(performance_data))]
-        print(f"Top clients based on performance: {[client_id for client_id, _ in top_clients]}")
-    
-        # Aggregate weights if any valid ones are collected
+            else:
+                print(f"Skipping client {client_proxy} due to inconsistent weight dimensions.")
+        
+        # Aggregate weights if any are valid
         if all_weights:
             num_layers = len(all_weights[0])
             aggregated_weights = [sum(weights[layer] for weights in all_weights) / total_data_points for layer in range(num_layers)]
             aggregated_parameters = weights_to_parameters(aggregated_weights)
         else:
             print(f"No valid weights to aggregate in round {rnd}.")
-    
+        
         print(f"Memory after round {rnd}:")
         self._log_memory_usage()
     
         return aggregated_parameters if aggregated_weights else None, {}
+
 
 
 
