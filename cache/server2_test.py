@@ -93,10 +93,10 @@ class CustomFedAvg(FedAvg):
         else:
           print(f"No valid weights to aggregate in round {rnd}.")
   
-      print(f"Memory after round {rnd}:")
-      self._log_memory_usage()
+        print(f"Memory after round {rnd}:")
+        self._log_memory_usage()
   
-      return aggregated_parameters if aggregated_weights else None, {}
+        return aggregated_parameters if aggregated_weights else None, {}
 
 
     def _evict_cache_if_needed(self, non_selected_client_ids: set):
