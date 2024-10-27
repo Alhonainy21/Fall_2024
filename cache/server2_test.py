@@ -41,7 +41,7 @@ class CustomFedAvg(FedAvg):
         aggregated_weights = None
         total_data_points = 0
         all_weights = []
-
+    
         for client_proxy, fit_res in results:
             client_id = client_proxy.cid
             if client_id not in self.client_id_mapping:
@@ -55,25 +55,22 @@ class CustomFedAvg(FedAvg):
                 weights = parameters_to_weights(fit_res.parameters)
                 print(f"Round {rnd}, Client {unique_id}: using direct update from client {client_ip}.")
             elif unique_id in self.last_update_cache:
-                # Check if cached weights are dimension-consistent
                 cached_weights = parameters_to_weights(self.last_update_cache[unique_id])
-                if len(cached_weights) == len(weights):  # Ensure dimensions match
-                    weights = cached_weights
-                    print(f"Round {rnd}, Client {unique_id}: using cached weights.")
-                else:
-                    print(f"Skipping cached weights for Client {unique_id} due to dimension mismatch.")
-                    continue
+                print(f"Round {rnd}, Client {unique_id}: using cached weights.")
+                weights = cached_weights  # Ensure weights is assigned here
             else:
-                print(f"Round {rnd}, Client {unique_id}: No update available.")
+                print(f"Round {rnd}, Client {unique_id}: No update available and no cached weights found.")
                 continue
     
             self.last_update_cache[unique_id] = fit_res.parameters
             self.last_num_data_points[unique_id] = fit_res.num_examples
     
-            # Aggregation if weights are dimension-consistent
-            weighted_weights = [np.array(w) * fit_res.num_examples for w in weights]
-            all_weights.append(weighted_weights)
-            total_data_points += fit_res.num_examples
+            if weights and len(weights) == len(self.last_update_cache[unique_id].tensors):
+                weighted_weights = [np.array(w) * fit_res.num_examples for w in weights]
+                all_weights.append(weighted_weights)
+                total_data_points += fit_res.num_examples
+            else:
+                print(f"Skipping client {client_proxy} due to inconsistent weight dimensions.")
     
         if all_weights:
             num_layers = len(all_weights[0])
@@ -86,6 +83,7 @@ class CustomFedAvg(FedAvg):
         self._log_memory_usage()
     
         return aggregated_parameters if aggregated_weights else None, {}
+
 
     def _evict_cache_if_needed(self, non_selected_client_ids: set):
         memory = psutil.virtual_memory()
