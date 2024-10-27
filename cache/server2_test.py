@@ -76,21 +76,21 @@ class CustomFedAvg(FedAvg):
                 print(f"Round {rnd}, Client {unique_id}: No update available.")
                 continue
           
-        # Update cache and aggregate weights
-        self.last_update_cache[unique_id] = fit_res.parameters
-        self.last_num_data_points[unique_id] = fit_res.num_examples
+            # Update cache and aggregate weights
+            self.last_update_cache[unique_id] = fit_res.parameters
+            self.last_num_data_points[unique_id] = fit_res.num_examples
   
-        # Multiply weights by number of examples
-        weighted_weights = [np.array(w) * fit_res.num_examples for w in weights]
-        all_weights.append(weighted_weights)
-        total_data_points += fit_res.num_examples
+            # Multiply weights by number of examples
+            weighted_weights = [np.array(w) * fit_res.num_examples for w in weights]
+            all_weights.append(weighted_weights)
+            total_data_points += fit_res.num_examples
   
       # Perform aggregation if weights are valid
-      if all_weights:
+        if all_weights:
           num_layers = len(all_weights[0])
           aggregated_weights = [sum(weights[layer] for weights in all_weights) / total_data_points for layer in range(num_layers)]
           aggregated_parameters = weights_to_parameters(aggregated_weights)
-      else:
+        else:
           print(f"No valid weights to aggregate in round {rnd}.")
   
       print(f"Memory after round {rnd}:")
