@@ -10,12 +10,13 @@ from torchvision import datasets
 from tqdm import tqdm
 from torchvision.models import resnet18, resnet50, densenet121, mobilenet_v2
 from efficientnet_pytorch import EfficientNet
+import time  # Missing import for time()
 
 DATA_ROOT = Path("/users/aga5h3/data")
 
 class Net(nn.Module):
     """Your custom Net class remains unchanged."""
-    # Your Net class definition here...
+    # Define your Net class here...
 
 def get_weights(model: nn.Module) -> fl.common.Weights:
     """Get model weights as a list of NumPy ndarrays."""
@@ -59,7 +60,7 @@ def MobileNetV2():
     return model
 
 def EfficientNetB0():
-    model = EfficientNet.from_pretrained('efficientnet-b0', num_classes=2)
+    model = EfficientNet.from_pretrained('efficientnet-b0', num_classes=3)
     model._conv_stem = torch.nn.Conv2d(3, 32, kernel_size=3, stride=1, padding=1, bias=False)
     nn.init.kaiming_normal_(model._conv_stem.weight, mode="fan_out", nonlinearity="relu")
     return model
@@ -80,23 +81,23 @@ def load_model(model_name: str) -> nn.Module:
     else:
         raise NotImplementedError(f"Model {model_name} is not implemented")
 
-def load_cifar(download=False) -> Tuple[datasets.CIFAR10, datasets.CIFAR10]:
+def load_cifar(download=False) -> Tuple[datasets.ImageFolder, datasets.ImageFolder]:
     transform = transforms.Compose([transforms.Resize((32,32)), transforms.ToTensor()])
     trainset = datasets.ImageFolder(DATA_ROOT/"train", transform=transform)
     testset = datasets.ImageFolder(DATA_ROOT/"test", transform=transform)
     return trainset, testset
 
 def train(
-    net: Net,
+    net: nn.Module,
     trainloader: torch.utils.data.DataLoader,
     epochs: int,
-    device: torch.device,  # pylint: disable=no-member
+    device: torch.device,
 ) -> None:
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
 
     print(f"Training {epochs} epoch(s) with {len(trainloader)} batches each")
-    t = time()
+    t = time.time()
     for epoch in range(epochs):
         running_loss = 0.0
         for i, data in enumerate(tqdm(trainloader, ascii=True), 0):
@@ -110,14 +111,14 @@ def train(
             if i % 2000 == 1999:
                 print("[%d, %5d] loss: %.3f" % (epoch + 1, i + 1, running_loss / 2000))
                 running_loss = 0.0
-    print(f"Epoch took: {time() - t:.2f} seconds")
-    test_loss, test_accuracy = test(net, testloader, device)
+    print(f"Epoch took: {time.time() - t:.2f} seconds")
+    test_loss, test_accuracy = test(net, trainloader, device)
     print(f"Test loss: {test_loss:.3f}, Test accuracy: {test_accuracy:.3f}")
 
 def test(
-    net: Net,
+    net: nn.Module,
     testloader: torch.utils.data.DataLoader,
-    device: torch.device,  # pylint: disable=no-member
+    device: torch.device,
 ) -> Tuple[float, float]:
     criterion = nn.CrossEntropyLoss()
     correct = 0
