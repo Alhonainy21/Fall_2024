@@ -90,7 +90,7 @@ class CustomFedAvg(FedAvg):
 
         print(f"Memory after round {rnd}:")
         self._log_memory_usage()
-        print("Top clients based on performance:", sorted(performance_reports, key=lambda x: -x["val_accuracy"])[:5])
+        #print("Top clients based on performance:", sorted(performance_reports, key=lambda x: -x["val_accuracy"])[:5])
 
         return aggregated_parameters if aggregated_weights else None, {}
 
