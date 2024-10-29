@@ -18,8 +18,10 @@ class CustomFedAvg(FedAvg):
         super().__init__(*args, **kwargs)
         self.client_id_mapping = {}
         self.last_update_cache = {}
+        self.last_update_time = {}  # Track the last update time for LRU cache
         self.next_client_id = 1
         self.improvement_threshold = 0.1  # Threshold for performance improvement
+        self.max_cache_size = 100  # Maximum number of clients to cache
 
     def _get_client_ip(self, fit_res):
         return fit_res.metrics.get("client_ip", "Unknown IP")
@@ -55,6 +57,7 @@ class CustomFedAvg(FedAvg):
                 weights = parameters_to_weights(fit_res.parameters)
                 print(f"Round {rnd}, Client {unique_id}: using direct update from client {client_ip}.")
                 self.last_update_cache[unique_id] = fit_res.parameters
+                self.last_update_time[unique_id] = time.time()  # Update cache time
             elif unique_id in self.last_update_cache:
                 weights = parameters_to_weights(self.last_update_cache[unique_id])
                 print(f"Round {rnd}, Client {unique_id}: using cached weights.")
@@ -78,6 +81,9 @@ class CustomFedAvg(FedAvg):
                 all_weights.append(weighted_weights)
                 total_data_points += fit_res.num_examples
 
+        # Evict old cached entries if needed
+        self._evict_cache_if_needed()
+
         if all_weights:
             num_layers = len(all_weights[0])
             aggregated_weights = [
@@ -93,6 +99,22 @@ class CustomFedAvg(FedAvg):
         print("Top clients based on performance:", sorted(performance_reports, key=lambda x: -x["val_accuracy"])[:5])
 
         return aggregated_parameters if aggregated_weights else None, {}
+
+    def _evict_cache_if_needed(self):
+        """Evict cached weights based on LRU if the cache exceeds max_cache_size."""
+        if len(self.last_update_cache) <= self.max_cache_size:
+            return
+
+        # Sort clients by their last update time (oldest first)
+        lru_clients = sorted(self.last_update_time.items(), key=lambda x: x[1])
+
+        # Remove oldest entries until cache is within the allowed size
+        while len(self.last_update_cache) > self.max_cache_size:
+            client_id, _ = lru_clients.pop(0)
+            if client_id in self.last_update_cache:
+                print(f"Evicting cached weights for client {client_id} to manage cache size.")
+                del self.last_update_cache[client_id]
+                del self.last_update_time[client_id]
 
 parser = argparse.ArgumentParser(description="Flower")
 parser.add_argument("--server_address", type=str, required=True, help=f"gRPC server address")
