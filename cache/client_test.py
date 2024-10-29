@@ -13,7 +13,6 @@ import utils
 from utils import get_weights, set_weights
 from torch.utils.data import DataLoader, random_split
 
-# pylint: disable=no-member
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 import socket
@@ -133,10 +132,9 @@ class CifarClient(fl.client.Client):
             "val_accuracy": val_accuracy,
             "test_loss": test_loss,
             "test_accuracy": test_accuracy,
-            "improvement": improvement,  # Track improvement for server to decide usage
+            "improvement": improvement,
             "client_ip": client_ip,
         }
-
 
         if self.current_round >= self.total_rounds:
             print(f"######### Client {self.cid} updates sent to server: {self.client_update_server}")
