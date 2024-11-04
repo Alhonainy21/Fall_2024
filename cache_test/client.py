@@ -122,8 +122,7 @@ class CifarClient(fl.client.Client):
         params_prime = fl.common.weights_to_parameters(weights_prime)
         num_examples_train = len(self.trainset)
 
-        # Send metrics, including improvement, to help the server decide on future updates
-        # Collect performance metrics at top level for serialization compatibility
+        # Metrics dictionary to send back to the server
         metrics = {
             "duration": timeit.default_timer() - fit_begin,
             "train_loss": train_loss,
@@ -135,7 +134,6 @@ class CifarClient(fl.client.Client):
             "improvement": improvement,
             "client_ip": client_ip,
         }
-
 
         if self.current_round >= self.total_rounds:
             print(f"######### Client {self.cid} updates sent to server: {self.client_update_server}")
