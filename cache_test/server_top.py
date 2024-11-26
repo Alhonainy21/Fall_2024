@@ -108,7 +108,8 @@ parser = argparse.ArgumentParser(description="Flower Federated Learning Server")
 parser.add_argument("--server_address", type=str, required=True, help="gRPC server address")
 parser.add_argument("--rounds", type=int, default=1, help="Number of federated learning rounds")
 parser.add_argument("--sample_fraction", type=float, default=1.0, help="Fraction of available clients used")
-parser.add_argument("--min_sample_size", type=int, default=2, help="Minimum number of clients used per round")
+parser.add_argument("--min_sample_size", type=int, default=8, help="Minimum number of clients used per round")
+parser.add_argument("--min_num_clients", type=int, default=2, help="Minimum number of clients for sampling")
 parser.add_argument("--log_host", type=str, help="Logserver address")
 parser.add_argument("--model", type=str, default="ResNet18", choices=["Net", "ResNet18", "MobileNetV2", "DenseNet121"], help="Model to train")
 parser.add_argument("--batch_size", type=int, default=32, help="Training batch size")
@@ -126,6 +127,7 @@ def main():
     strategy = CustomFedAvg(
         fraction_fit=args.sample_fraction,
         min_fit_clients=args.min_sample_size,
+        min_available_clients=args.min_num_clients,
         eval_fn=get_eval_fn(testset),
         on_fit_config_fn=fit_config,
     )
