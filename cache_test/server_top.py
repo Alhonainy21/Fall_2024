@@ -16,7 +16,7 @@ class CustomFedAvg(FedAvg):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.client_id_mapping = {}
-        self.last_update_cache = {}  # Stores weights for top 70% clients
+        self.last_update_cache = {}
         self.next_client_id = 1
 
     def _get_client_ip(self, fit_res):
@@ -110,7 +110,7 @@ parser.add_argument("--rounds", type=int, default=1, help="Number of federated l
 parser.add_argument("--sample_fraction", type=float, default=1.0, help="Fraction of available clients used")
 parser.add_argument("--min_sample_size", type=int, default=2, help="Minimum number of clients used per round")
 parser.add_argument("--log_host", type=str, help="Logserver address")
-parser.add_argument("--model", type=str, default="ResNet18", choices=["Net", "ResNet18", "MobileNetV2"], help="Model to train")
+parser.add_argument("--model", type=str, default="ResNet18", choices=["Net", "ResNet18", "MobileNetV2", "DenseNet121"], help="Model to train")
 parser.add_argument("--batch_size", type=int, default=32, help="Training batch size")
 parser.add_argument("--num_workers", type=int, default=4, help="Number of dataset reading workers")
 parser.add_argument("--pin_memory", action="store_true")
