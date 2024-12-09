@@ -18,10 +18,7 @@ class CustomFedAvg(FedAvg):
         super().__init__(*args, **kwargs)
         self.client_id_mapping = {}
         self.last_update_cache = {}
-        self.last_update_time = {}  # Track the last update time for LRU cache
         self.next_client_id = 1
-        self.improvement_threshold = 0.1  # Threshold for performance improvement
-        self.max_cache_size = 100  # Maximum number of clients to cache
 
     def _get_client_ip(self, fit_res):
         return fit_res.metrics.get("client_ip", "Unknown IP")
@@ -38,11 +35,11 @@ class CustomFedAvg(FedAvg):
         print(f"Memory before round {rnd}:")
         self._log_memory_usage()
         
-        aggregated_weights = None
-        total_data_points = 0
-        all_weights = []
         performance_reports = []
-
+        all_weights = []
+        total_data_points = 0
+        
+        # Collect each client's performance metrics and weights
         for client_proxy, fit_res in results:
             client_id = client_proxy.cid
             if client_id not in self.client_id_mapping:
@@ -51,13 +48,34 @@ class CustomFedAvg(FedAvg):
             unique_id = self.client_id_mapping[client_id]
 
             client_ip = self._get_client_ip(fit_res)
-            improvement = fit_res.metrics.get("improvement", 0.0)
+            val_accuracy = fit_res.metrics.get("val_accuracy", 0.0)
+
+            # Record client performance
+            performance_reports.append({
+                "client_proxy": client_proxy,
+                "fit_res": fit_res,
+                "val_accuracy": val_accuracy,
+                "unique_id": unique_id,
+                "client_ip": client_ip,
+            })
+
+        # Sort clients by validation accuracy in descending order
+        performance_reports.sort(key=lambda x: x["val_accuracy"], reverse=True)
+
+        # Select the top 2 clients
+        top_clients = performance_reports[:2]
+
+        # Aggregate only the top 2 clients
+        for report in top_clients:
+            client_proxy = report["client_proxy"]
+            fit_res = report["fit_res"]
+            unique_id = report["unique_id"]
+            client_ip = report["client_ip"]
 
             if fit_res.parameters.tensors:
                 weights = parameters_to_weights(fit_res.parameters)
                 print(f"Round {rnd}, Client {unique_id}: using direct update from client {client_ip}.")
                 self.last_update_cache[unique_id] = fit_res.parameters
-                self.last_update_time[unique_id] = time.time()  # Update cache time
             elif unique_id in self.last_update_cache:
                 weights = parameters_to_weights(self.last_update_cache[unique_id])
                 print(f"Round {rnd}, Client {unique_id}: using cached weights.")
@@ -65,25 +83,20 @@ class CustomFedAvg(FedAvg):
                 print(f"Round {rnd}, Client {unique_id}: No update available.")
                 continue
 
-            performance_reports.append({
-                "client_id": unique_id,
-                "train_loss": fit_res.metrics.get("train_loss"),
-                "train_accuracy": fit_res.metrics.get("train_accuracy"),
-                "val_loss": fit_res.metrics.get("val_loss"),
-                "val_accuracy": fit_res.metrics.get("val_accuracy"),
-                "test_loss": fit_res.metrics.get("test_loss"),
-                "test_accuracy": fit_res.metrics.get("test_accuracy"),
-                "improvement": improvement
-            })
+            # Weighted aggregation based on the number of examples each client has
+            weighted_weights = [np.array(w) * fit_res.num_examples for w in weights]
+            all_weights.append(weighted_weights)
+            total_data_points += fit_res.num_examples
 
-            if weights and len(weights) == len(parameters_to_weights(self.last_update_cache[unique_id])):
-                weighted_weights = [np.array(w) * fit_res.num_examples for w in weights]
-                all_weights.append(weighted_weights)
-                total_data_points += fit_res.num_examples
+        # Remove unused clients from the cache
+        cached_client_ids = set(self.last_update_cache.keys())
+        top_client_ids = {report["unique_id"] for report in top_clients}
+        unused_client_ids = cached_client_ids - top_client_ids
+        for unique_id in unused_client_ids:
+            print(f"Removing unused cache for Client {unique_id}.")
+            del self.last_update_cache[unique_id]
 
-        # Evict old cached entries if needed
-        self._evict_cache_if_needed()
-
+        # Perform weighted average on selected clients' weights
         if all_weights:
             num_layers = len(all_weights[0])
             aggregated_weights = [
@@ -93,29 +106,14 @@ class CustomFedAvg(FedAvg):
             aggregated_parameters = weights_to_parameters(aggregated_weights)
         else:
             print(f"No valid weights to aggregate in round {rnd}.")
+            aggregated_parameters = None
 
         print(f"Memory after round {rnd}:")
         self._log_memory_usage()
-        print("Top clients based on performance:", sorted(performance_reports, key=lambda x: -x["val_accuracy"])[:5])
 
-        return aggregated_parameters if aggregated_weights else None, {}
+        return aggregated_parameters, {}
 
-    def _evict_cache_if_needed(self):
-        """Evict cached weights based on LRU if the cache exceeds max_cache_size."""
-        if len(self.last_update_cache) <= self.max_cache_size:
-            return
-
-        # Sort clients by their last update time (oldest first)
-        lru_clients = sorted(self.last_update_time.items(), key=lambda x: x[1])
-
-        # Remove oldest entries until cache is within the allowed size
-        while len(self.last_update_cache) > self.max_cache_size:
-            client_id, _ = lru_clients.pop(0)
-            if client_id in self.last_update_cache:
-                print(f"Evicting cached weights for client {client_id} to manage cache size.")
-                del self.last_update_cache[client_id]
-                del self.last_update_time[client_id]
-
+# Argument parser setup
 parser = argparse.ArgumentParser(description="Flower")
 parser.add_argument("--server_address", type=str, required=True, help=f"gRPC server address")
 parser.add_argument("--rounds", type=int, default=1, help="Number of federated learning rounds")
