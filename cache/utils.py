@@ -17,7 +17,6 @@ DATA_ROOT = Path("/users/aga5h3/data")
 
 class Net(nn.Module):
     """Your custom Net class remains unchanged."""
-    # Your Net class definition here...
 
 def get_weights(model: nn.Module) -> fl.common.Weights:
     """Get model weights as a list of NumPy ndarrays."""
@@ -103,23 +102,6 @@ def load_model(model_name: str) -> nn.Module:
     else:
         raise NotImplementedError(f"model {model_name} is not implemented")
 
-#     return trainset, testset
-# def load_cifar(download=True) -> Tuple[datasets.CIFAR10, datasets.CIFAR10]:
-#     transform = transforms.Compose([
-#         transforms.ToTensor(),
-#         transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-#     ])
-    
-#     # Load the CIFAR-10 training dataset
-#     training_set = datasets.CIFAR10(root=DATA_ROOT / "cifar-10", train=True, download=download, transform=transform)
-
-    
-#     # Load the CIFAR-10 testing dataset
-#     testing_set = datasets.CIFAR10(root=DATA_ROOT / "cifar-10", train=False, download=download, transform=transform)
-
-    
-#     # Return the training and testing datasets without any class-based filtering
-#     return training_set, testing_set
 
 def load_cifar(download=False) -> Tuple[datasets.CIFAR10, datasets.CIFAR10]:
     transform = transforms.Compose([transforms.Resize((32,32)),transforms.ToTensor()])
