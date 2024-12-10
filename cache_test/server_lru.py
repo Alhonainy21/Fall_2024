@@ -13,7 +13,7 @@ from flwr.server.client_proxy import ClientProxy
 import logging
 import time
 
-# CustomFedAvg with LRU caching
+#############################CustomFedAvg with LRU caching###################################
 class CustomFedAvg(FedAvg):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
