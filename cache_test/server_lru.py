@@ -18,9 +18,9 @@ class CustomFedAvg(FedAvg):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.client_id_mapping = {}
-        self.last_update_cache = OrderedDict()  # Use OrderedDict for LRU behavior
+        self.last_update_cache = OrderedDict()
         self.next_client_id = 1
-        self.improvement_threshold = 0.1  # Threshold for performance improvement
+        self.improvement_threshold = 0.1
 
     def _get_client_ip(self, fit_res):
         return fit_res.metrics.get("client_ip", "Unknown IP")
@@ -39,12 +39,10 @@ class CustomFedAvg(FedAvg):
         
         all_weights = []
         total_data_points = 0
-        
-        # Determine the cache size as 70% of the current number of clients
+    
         num_clients = len(results)
         max_cache_size = int(0.7 * num_clients)
-        
-        # Collect each client's weights and manage LRU cache
+    
         for client_proxy, fit_res in results:
             client_id = client_proxy.cid
             if client_id not in self.client_id_mapping:
