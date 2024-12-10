@@ -10,13 +10,12 @@ from torchvision import datasets
 from tqdm import tqdm
 from torchvision.models import resnet18, resnet50, densenet121, mobilenet_v2
 from efficientnet_pytorch import EfficientNet
-import time  # Missing import for time()
+import time
 
 DATA_ROOT = Path("/users/aga5h3")
 
 class Net(nn.Module):
     """Your custom Net class remains unchanged."""
-    # Define your Net class here...
 
 def get_weights(model: nn.Module) -> fl.common.Weights:
     """Get model weights as a list of NumPy ndarrays."""
