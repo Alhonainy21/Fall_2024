@@ -19,7 +19,7 @@ class CustomFedAvg(FedAvg):
         self.client_id_mapping = {}
         self.last_update_cache = OrderedDict()  # Use OrderedDict for FIFO behavior
         self.next_client_id = 1
-        self.improvement_threshold = 0.1  # Threshold for performance improvement
+        self.improvement_threshold = 0.1
 
     def _get_client_ip(self, fit_res):
         return fit_res.metrics.get("client_ip", "Unknown IP")
