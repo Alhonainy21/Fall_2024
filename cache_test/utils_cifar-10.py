@@ -34,14 +34,14 @@ def set_weights(model: nn.Module, weights: fl.common.Weights) -> None:
 
 
 def ResNet18():
-    model = resnet18(num_classes=3)
+    model = resnet18(num_classes=10)
     model.conv1 = torch.nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False)
     nn.init.kaiming_normal_(model.conv1.weight, mode="fan_out", nonlinearity="relu")
     model.maxpool = torch.nn.Identity()
     return model
 
 def ResNet50():
-    model = resnet50(num_classes=3)
+    model = resnet50(num_classes=10)
     model.conv1 = torch.nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False)
     nn.init.kaiming_normal_(model.conv1.weight, mode="fan_out", nonlinearity="relu")
     model.maxpool = torch.nn.Identity()
@@ -54,13 +54,13 @@ def DenseNet121():
     return model
 
 def MobileNetV2():
-    model = mobilenet_v2(num_classes=3)
+    model = mobilenet_v2(num_classes=10)
     model.features[0][0] = torch.nn.Conv2d(3, 32, kernel_size=3, stride=1, padding=1, bias=False)
     nn.init.kaiming_normal_(model.features[0][0].weight, mode="fan_out", nonlinearity="relu")
     return model
 
 def EfficientNetB0():
-    model = EfficientNet.from_pretrained('efficientnet-b0', num_classes=3)
+    model = EfficientNet.from_pretrained('efficientnet-b0', num_classes=10)
     model._conv_stem = torch.nn.Conv2d(3, 32, kernel_size=3, stride=1, padding=1, bias=False)
     nn.init.kaiming_normal_(model._conv_stem.weight, mode="fan_out", nonlinearity="relu")
     return model
