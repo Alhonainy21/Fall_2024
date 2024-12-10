@@ -13,13 +13,14 @@ from flwr.server.client_proxy import ClientProxy
 import logging
 import time
 
+####################################_FIFO cache raplacement_##################################
 class CustomFedAvg(FedAvg):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.client_id_mapping = {}
-        self.last_update_cache = OrderedDict()  # Use OrderedDict for FIFO behavior
+        self.last_update_cache = OrderedDict()
         self.next_client_id = 1
-        self.improvement_threshold = 0.1  # Threshold for performance improvement
+        self.improvement_threshold = 0.1
 
     def _get_client_ip(self, fit_res):
         return fit_res.metrics.get("client_ip", "Unknown IP")
