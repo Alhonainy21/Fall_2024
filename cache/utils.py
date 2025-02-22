@@ -78,7 +78,7 @@ def MobileNetV2():
 
 def EfficientNetB0():
     """Returns an EfficientNetB0 model from efficientnet_pytorch adapted for CIFAR-10."""
-    model = EfficientNet.from_pretrained('efficientnet-b0', num_classes=2)
+    model = EfficientNet.from_pretrained('efficientnet-b0', num_classes=3)
 
     # replace w/ smaller input layer
     model._conv_stem = torch.nn.Conv2d(3, 32, kernel_size=3, stride=1, padding=1, bias=False)
